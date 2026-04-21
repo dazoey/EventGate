@@ -1,4 +1,4 @@
-import { HelpCircle, Mail, MessageSquare, Phone } from 'lucide-react';
+import { Mail, MessageSquare } from 'lucide-react';
 
 export default function Help() {
   return (

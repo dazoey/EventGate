@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Settings as SettingsIcon, User, Save, Loader2, Bell, Lock, Check, AlertCircle } from 'lucide-react';
+import { Settings as SettingsIcon, User, Save, Loader2, Bell, Check } from 'lucide-react';
 
 export default function Settings() {
   const navigate = useNavigate();

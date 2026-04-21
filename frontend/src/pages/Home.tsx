@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Calendar, MapPin, Ticket, Loader2, AlertCircle, Search, SlidersHorizontal, X } from 'lucide-react';
+import { MapPin, Ticket, AlertCircle, Search, SlidersHorizontal, X } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
 interface Event {
