@@ -19,16 +19,35 @@ app.get('/api/health', (req, res) => {
 });
 app.get('/api/events', async (req, res) => {
     try {
-        const { data, error } = await supabase.from('events').select('*');
+        const { search, place, sort } = req.query;
+        let query = supabase.from('events').select('*');
+        if (search && typeof search === 'string' && search.trim() !== '') {
+            query = query.ilike('title', `%${search.trim()}%`);
+        }
+        if (place && typeof place === 'string' && place.trim() !== '') {
+            query = query.ilike('location', `%${place.trim()}%`);
+        }
+        // Server-side Sorting
+        if (sort === 'price-asc') {
+            query = query.order('price', { ascending: true });
+        }
+        else if (sort === 'price-desc') {
+            query = query.order('price', { ascending: false });
+        }
+        else {
+            query = query.order('created_at', { ascending: false });
+        }
+        const { data, error } = await query;
         if (error)
             throw error;
-        res.json(data);
+        res.json(data || []);
     }
     catch (error) {
         console.error('Error fetching events:', error);
         res.status(500).json({ error: error.message });
     }
 });
+// Get single event
 app.get('/api/events/:id', async (req, res) => {
     try {
         const { data, error } = await supabase.from('events').select('*').eq('id', req.params.id).single();
@@ -40,6 +59,33 @@ app.get('/api/events/:id', async (req, res) => {
     }
     catch (error) {
         console.error('Error fetching event details:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+// Create new event
+app.post('/api/events', upload.single('image'), async (req, res) => {
+    try {
+        const { title, description, date, location, price } = req.body;
+        let imageUrl = null;
+        if (req.file) {
+            const fileName = `events/${Date.now()}-${req.file.originalname}`;
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('eventgate-bucket')
+                .upload(fileName, req.file.buffer, { contentType: req.file.mimetype });
+            if (uploadError)
+                throw uploadError;
+            const { data: publicUrlData } = supabase.storage.from('eventgate-bucket').getPublicUrl(fileName);
+            imageUrl = publicUrlData.publicUrl;
+        }
+        const { data, error } = await supabase.from('events').insert([{
+                title, description, date, location, price: parseFloat(price), image_url: imageUrl
+            }]).select();
+        if (error)
+            throw error;
+        res.status(201).json({ message: 'Event created successfully', event: data[0] });
+    }
+    catch (error) {
+        console.error('Error creating event:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -86,6 +132,7 @@ app.get('/api/admin/bookings', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// Admin: Update booking status
 app.patch('/api/admin/bookings/:id', async (req, res) => {
     try {
         const { status } = req.body;
@@ -95,6 +142,69 @@ app.patch('/api/admin/bookings/:id', async (req, res) => {
         res.json(data[0]);
     }
     catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+// User: Get personal bookings
+app.get('/api/bookings/user/:email', async (req, res) => {
+    try {
+        const { email } = req.params;
+        const { data, error } = await supabase
+            .from('bookings')
+            .select('*, events(title, date, location, image_url)')
+            .eq('user_email', email)
+            .order('created_at', { ascending: false });
+        if (error)
+            throw error;
+        res.json(data);
+    }
+    catch (error) {
+        console.error('Error fetching user bookings:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+// Profile: Get user profile
+app.get('/api/profiles/:id', async (req, res) => {
+    try {
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', req.params.id).single();
+        if (error && error.code !== 'PGRST116')
+            throw error; // ignore not found
+        res.json(data || {});
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+// Profile: Update or Create user profile
+app.put('/api/profiles/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { full_name, display_name, email_tickets, event_updates } = req.body;
+        // Hilangkan karakter aneh atau spasi dari ID
+        const cleanId = id.trim();
+        if (!cleanId || cleanId === ':id') {
+            return res.status(400).json({ error: 'User ID tidak valid' });
+        }
+        const { data, error } = await supabase
+            .from('profiles')
+            .upsert({
+            id: cleanId,
+            full_name,
+            display_name,
+            email_tickets: email_tickets ?? true,
+            event_updates: event_updates ?? false,
+            updated_at: new Date().toISOString()
+        })
+            .select();
+        if (error) {
+            console.error('❌ Supabase Database Error:', error.message);
+            return res.status(400).json({ error: error.message });
+        }
+        console.log(`✅ Profil updated: ${cleanId}`);
+        res.json(data[0]);
+    }
+    catch (error) {
+        console.error('❌ Server Error:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
