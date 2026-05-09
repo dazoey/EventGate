@@ -2,7 +2,7 @@ import { Ticket } from 'lucide-react';
 
 export default function Footer() {
   return (
-    <footer className="bg-[#0f172a] text-white py-12 px-6 md:px-12 mt-12">
+    <footer id="footer" className="bg-[#0f172a] text-white py-12 px-6 md:px-12 mt-12">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
         <div>
           <div className="flex items-center gap-2 font-bold text-xl mb-4">
