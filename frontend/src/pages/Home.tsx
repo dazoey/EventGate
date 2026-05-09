@@ -50,7 +50,7 @@ export default function Home() {
         setEvents(data);
         setIsSampleMode(false);
       }
-    } catch (err) {
+    } catch {
       console.warn('Backend disconnected, using sample data');
       setEvents(mockEvents);
       setIsSampleMode(true);
@@ -69,6 +69,10 @@ export default function Home() {
 
   const scrollToEvents = () => {
     document.getElementById('upcoming-events')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const scrollToFooter = () => {
+    document.getElementById('footer')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const clearFilters = () => {
@@ -93,7 +97,10 @@ export default function Home() {
             >
               Get Ticket
             </button>
-            <button className="border border-white/20 hover:bg-white/10 px-8 py-3 rounded-full font-medium transition-all">
+            <button 
+              onClick={scrollToFooter}
+              className="border border-white/20 hover:bg-white/10 px-8 py-3 rounded-full font-medium transition-all"
+            >
               Learn More
             </button>
           </div>

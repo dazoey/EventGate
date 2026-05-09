@@ -132,7 +132,7 @@ app.get('/api/admin/bookings', async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
       .from('bookings')
-      .select('*, events(title)')
+      .select('*, events(title, price)')
       .order('created_at', { ascending: false });
     if (error) throw error;
     res.json(data);
