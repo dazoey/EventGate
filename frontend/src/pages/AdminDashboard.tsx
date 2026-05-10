@@ -1,5 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Loader2, CheckCircle, XCircle, Eye } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Loader2, CheckCircle, XCircle, Eye, Download, FileSpreadsheet, Calendar as CalendarIcon } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface Booking {
   id: string;
@@ -17,6 +21,10 @@ interface Booking {
 export default function AdminDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Date filter state
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const fetchBookings = async () => {
     try {
@@ -50,49 +58,137 @@ export default function AdminDashboard() {
     }
   };
 
-  if (loading) return <div className="flex justify-center items-center min-h-screen"><Loader2 className="animate-spin w-10 h-10 text-blue-600" /></div>;
-
-  const totalTicketsSold = bookings
-    .filter(b => b.status === 'confirmed')
-    .reduce((sum, b) => sum + b.quantity, 0);
-
-  const pendingVerifications = bookings
-    .filter(b => b.status === 'pending')
-    .length;
-
-  const totalRevenue = bookings
-    .filter(b => b.status === 'confirmed')
-    .reduce((sum, b) => sum + (b.quantity * (b.events?.price || 0)), 0);
-
   const formatRupiah = (number: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(number);
   };
 
-  // Kalkulasi performa per event
-  const eventStats = bookings.reduce((acc, booking) => {
+  // 1. Filter bookings by date
+  const filteredBookings = useMemo(() => {
+    return bookings.filter(b => {
+      if (!startDate && !endDate) return true;
+      const bookingDate = new Date(b.created_at).getTime();
+      const start = startDate ? new Date(startDate).getTime() : 0;
+      const end = endDate ? new Date(endDate).getTime() + 86400000 : Infinity; // +1 day to include end date fully
+      return bookingDate >= start && bookingDate <= end;
+    });
+  }, [bookings, startDate, endDate]);
+
+  // 2. Global Stats based on Filtered Data
+  const totalTicketsSold = filteredBookings
+    .filter(b => b.status === 'confirmed')
+    .reduce((sum, b) => sum + b.quantity, 0);
+
+  const pendingVerifications = filteredBookings
+    .filter(b => b.status === 'pending')
+    .length;
+
+  const totalRevenue = filteredBookings
+    .filter(b => b.status === 'confirmed')
+    .reduce((sum, b) => sum + (b.quantity * (b.events?.price || 0)), 0);
+
+  // 3. Chart Data (Daily Revenue)
+  const chartData = useMemo(() => {
+    const dailyMap = filteredBookings
+      .filter(b => b.status === 'confirmed')
+      .reduce((acc, b) => {
+        const dateObj = new Date(b.created_at);
+        const sortKey = dateObj.toISOString().split('T')[0]; 
+        const revenue = b.quantity * (b.events?.price || 0);
+        
+        if (!acc[sortKey]) {
+          acc[sortKey] = {
+            revenue: 0,
+            displayDate: dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })
+          };
+        }
+        acc[sortKey].revenue += revenue;
+        return acc;
+      }, {} as Record<string, { revenue: number; displayDate: string }>);
+
+    return Object.entries(dailyMap)
+      .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+      .map(([, data]) => ({
+        date: data.displayDate,
+        revenue: data.revenue
+      }));
+  }, [filteredBookings]);
+
+  // 4. Per Event Stats
+  const eventStats = filteredBookings.reduce((acc, booking) => {
     if (booking.status !== 'confirmed') return acc;
-    
     const eventName = booking.events?.title || 'Unknown Event';
     const revenue = booking.quantity * (booking.events?.price || 0);
-
-    if (!acc[eventName]) {
-      acc[eventName] = { ticketsSold: 0, revenue: 0 };
-    }
     
+    if (!acc[eventName]) acc[eventName] = { ticketsSold: 0, revenue: 0 };
     acc[eventName].ticketsSold += booking.quantity;
     acc[eventName].revenue += revenue;
-    
     return acc;
   }, {} as Record<string, { ticketsSold: number, revenue: number }>);
 
-  // Ubah object ke array dan urutkan berdasarkan tiket terjual terbanyak
   const sortedEventStats = Object.entries(eventStats)
     .map(([eventName, stats]) => ({ eventName, ...stats }))
     .sort((a, b) => b.ticketsSold - a.ticketsSold);
 
+  // 5. Export Handlers
+  const exportToExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(sortedEventStats.map(s => ({
+      'Nama Event': s.eventName,
+      'Tiket Terjual': s.ticketsSold,
+      'Pendapatan (IDR)': s.revenue
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Laporan Pendapatan");
+    XLSX.writeFile(wb, "Laporan_Pendapatan_EventGate.xlsx");
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    doc.text("Laporan Pendapatan EventGate", 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Periode: ${startDate || 'Semua'} s/d ${endDate || 'Semua'}`, 14, 22);
+
+    const tableColumn = ["Nama Event", "Tiket Terjual", "Pendapatan (Rp)"];
+    const tableRows = sortedEventStats.map(stat => [
+      stat.eventName,
+      stat.ticketsSold.toString(),
+      formatRupiah(stat.revenue)
+    ]);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (doc as any).autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 28,
+    });
+
+    doc.save("Laporan_Pendapatan_EventGate.pdf");
+  };
+
+  if (loading) return <div className="flex justify-center items-center min-h-screen"><Loader2 className="animate-spin w-10 h-10 text-blue-600" /></div>;
+
   return (
     <div className="max-w-7xl mx-auto py-10 px-6">
-      <h1 className="text-3xl font-bold mb-8">Admin Dashboard - Manajemen Tiket</h1>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        
+        {/* Date Filter & Export */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm text-sm">
+            <CalendarIcon className="w-4 h-4 text-gray-500" />
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="outline-none bg-transparent text-gray-700" />
+            <span className="text-gray-400">-</span>
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="outline-none bg-transparent text-gray-700" />
+          </div>
+          
+          <button onClick={exportToExcel} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            <FileSpreadsheet className="w-4 h-4" /> Excel
+          </button>
+          
+          <button onClick={exportToPDF} className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            <Download className="w-4 h-4" /> PDF
+          </button>
+        </div>
+      </div>
       
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -110,8 +206,28 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* Chart Section */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
+        <h2 className="text-xl font-bold mb-6">Grafik Pendapatan Harian</h2>
+        <div className="h-72 w-full">
+          {chartData.length === 0 ? (
+             <div className="flex h-full items-center justify-center text-gray-400">Tidak ada data di rentang tanggal ini.</div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="date" tick={{fontSize: 12}} tickLine={false} axisLine={{stroke: '#e5e7eb'}} />
+                <YAxis tickFormatter={(val) => `Rp${val/1000}k`} tick={{fontSize: 12}} tickLine={false} axisLine={false} />
+                <Tooltip formatter={(value: number | string) => formatRupiah(Number(value) || 0)} />
+                <Line type="monotone" dataKey="revenue" stroke="#2563eb" strokeWidth={3} dot={{r: 4, fill: '#2563eb', strokeWidth: 2, stroke: '#fff'}} activeDot={{r: 6}} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
       {/* Performa per Event */}
-      <h2 className="text-xl font-bold mb-4 mt-12">Performa per Event</h2>
+      <h2 className="text-xl font-bold mb-4">Performa per Event</h2>
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-12">
         <table className="w-full text-left border-collapse">
           <thead>
@@ -150,10 +266,10 @@ export default function AdminDashboard() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {bookings.length === 0 ? (
+            {filteredBookings.length === 0 ? (
               <tr><td colSpan={5} className="px-6 py-10 text-center text-gray-400">Belum ada pemesanan.</td></tr>
             ) : (
-              bookings.map((booking) => (
+              filteredBookings.map((booking) => (
                 <tr key={booking.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="font-medium text-gray-900">{booking.user_name}</div>
