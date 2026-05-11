@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Upload, MapPin, Calendar, DollarSign, Type, FileText, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { Loader2, Upload, MapPin, Calendar, DollarSign, Type, FileText, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Ticket } from 'lucide-react';
 
 const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
@@ -26,7 +26,8 @@ export default function CreateEvent() {
     description: '',
     date: '',
     location: '',
-    price: ''
+    price: '',
+    ticket_quota: ''
   });
 
   const today = new Date();
@@ -105,6 +106,7 @@ export default function CreateEvent() {
     data.append('date', formData.date);
     data.append('location', formData.location);
     data.append('price', formData.price);
+    data.append('ticket_quota', formData.ticket_quota);
     if (image) data.append('image', image);
 
     try {
@@ -372,6 +374,22 @@ export default function CreateEvent() {
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <Ticket className="w-4 h-4 text-blue-500" /> Kuota Tiket
+              </label>
+              <input
+                required
+                type="text"
+                inputMode="numeric"
+                placeholder="Contoh: 500"
+                value={formatRupiah(formData.ticket_quota)}
+                onChange={e => setFormData({ ...formData, ticket_quota: e.target.value.replace(/\D/g, '') })}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              />
+              <p className="text-xs text-gray-400">Jumlah total tiket yang tersedia untuk event ini</p>
             </div>
           </div>
 

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS events (
   date TEXT, -- Store as text or use TIMESTAMP (e.g., '14 APR 2026')
   location TEXT,
   price DECIMAL NOT NULL DEFAULT 0,
+  ticket_quota INTEGER NOT NULL DEFAULT 0,
   image_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

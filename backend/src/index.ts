@@ -71,7 +71,7 @@ app.get('/api/events/:id', async (req: Request, res: Response) => {
 // Create new event
 app.post('/api/events', upload.single('image'), async (req: Request, res: Response): Promise<any> => {
   try {
-    const { title, description, date, location, price } = req.body;
+    const { title, description, date, location, price, ticket_quota } = req.body;
     let imageUrl = null;
 
     if (req.file) {
@@ -86,13 +86,32 @@ app.post('/api/events', upload.single('image'), async (req: Request, res: Respon
     }
 
     const { data, error } = await supabase.from('events').insert([{
-      title, description, date, location, price: parseFloat(price), image_url: imageUrl
+      title, description, date, location, price: parseFloat(price), image_url: imageUrl,
+      ticket_quota: ticket_quota ? parseInt(ticket_quota, 10) : 0
     }]).select();
 
     if (error) throw error;
     res.status(201).json({ message: 'Event created successfully', event: data[0] });
   } catch (error: any) {
     console.error('Error creating event:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get sold tickets count for an event
+app.get('/api/events/:id/sold', async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('quantity')
+      .eq('event_id', req.params.id)
+      .eq('status', 'confirmed');
+
+    if (error) throw error;
+    const sold = (data || []).reduce((sum: number, b: any) => sum + (b.quantity || 0), 0);
+    res.json({ sold });
+  } catch (error: any) {
+    console.error('Error fetching sold tickets:', error);
     res.status(500).json({ error: error.message });
   }
 });

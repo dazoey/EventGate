@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, MapPin, Share2, Heart, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, Share2, Heart, Loader2, Ticket } from 'lucide-react';
 
 interface Event {
   id: string;
@@ -10,6 +10,7 @@ interface Event {
   location: string;
   price: number;
   image_url: string;
+  ticket_quota: number;
 }
 
 export default function EventDetails() {
@@ -18,6 +19,7 @@ export default function EventDetails() {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [soldTickets, setSoldTickets] = useState(0);
   
   // Form State
   const [name, setName] = useState('');
@@ -32,6 +34,13 @@ export default function EventDetails() {
         const response = await fetch(`${import.meta.env.VITE_API_URL}/events/${id}`);
         const data = await response.json();
         setEvent(data);
+
+        // Fetch confirmed bookings to calculate sold tickets
+        const bookingsRes = await fetch(`${import.meta.env.VITE_API_URL}/events/${id}/sold`);
+        if (bookingsRes.ok) {
+          const bookingsData = await bookingsRes.json();
+          setSoldTickets(bookingsData.sold || 0);
+        }
       } catch (error) {
         console.error('Error fetching event:', error);
       } finally {
@@ -116,7 +125,7 @@ export default function EventDetails() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 <div className="flex items-center gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50">
                   <Calendar className="w-6 h-6 text-gray-500" />
                   <div>
@@ -131,6 +140,26 @@ export default function EventDetails() {
                     <div className="text-sm text-blue-600">{event.location}</div>
                   </div>
                 </div>
+                {event.ticket_quota > 0 && (() => {
+                  const remaining = event.ticket_quota - soldTickets;
+                  const percentage = (soldTickets / event.ticket_quota) * 100;
+                  const statusColor = remaining <= 0 ? 'text-red-600' : remaining <= event.ticket_quota * 0.2 ? 'text-amber-600' : 'text-emerald-600';
+                  const barColor = remaining <= 0 ? 'bg-red-500' : remaining <= event.ticket_quota * 0.2 ? 'bg-amber-500' : 'bg-emerald-500';
+                  return (
+                    <div className="flex items-center gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50">
+                      <Ticket className="w-6 h-6 text-gray-500" />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-gray-900">Sisa Tiket</div>
+                        <div className={`text-sm font-bold ${statusColor}`}>
+                          {remaining <= 0 ? 'Habis' : `${remaining.toLocaleString('id-ID')} / ${event.ticket_quota.toLocaleString('id-ID')}`}
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1.5">
+                          <div className={`${barColor} h-1.5 rounded-full transition-all duration-500`} style={{ width: `${Math.min(percentage, 100)}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div>
