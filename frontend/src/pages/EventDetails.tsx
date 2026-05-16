@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, MapPin, Share2, Heart, Loader2, Ticket } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface Event {
   id: string;
@@ -27,6 +28,29 @@ export default function EventDetails() {
   const [category, setCategory] = useState('Regular');
   const [quantity, setQuantity] = useState(1);
   const [proof, setProof] = useState<File | null>(null);
+
+  // Auto-fill nama dan email dari profil user yang sedang login
+  useEffect(() => {
+    const prefillUserData = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          // Set email dari Supabase Auth
+          setEmail(session.user.email || '');
+
+          // Fetch profil untuk mendapatkan nama lengkap
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/profiles/${session.user.id}`);
+          if (response.ok) {
+            const profile = await response.json();
+            setName(profile.full_name || profile.display_name || '');
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    };
+    prefillUserData();
+  }, []);
 
   useEffect(() => {
     const fetchEvent = async () => {
