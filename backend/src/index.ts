@@ -68,6 +68,18 @@ app.get('/api/events/:id', async (req: Request, res: Response) => {
   }
 });
 
+// Admin: Delete event
+app.delete('/api/events/:id', async (req: Request, res: Response) => {
+  try {
+    const { error } = await supabase.from('events').delete().eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ message: 'Event deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting event:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Create new event
 app.post('/api/events', upload.single('image'), async (req: Request, res: Response): Promise<any> => {
   try {

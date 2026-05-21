@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, MapPin, Share2, Heart, Loader2, Ticket } from 'lucide-react';
+import { Calendar, MapPin, Share2, Heart, Loader2, Ticket, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface Event {
@@ -21,6 +21,7 @@ export default function EventDetails() {
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [soldTickets, setSoldTickets] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
   
   // Form State
   const [name, setName] = useState('');
@@ -38,11 +39,14 @@ export default function EventDetails() {
           // Set email dari Supabase Auth
           setEmail(session.user.email || '');
 
-          // Fetch profil untuk mendapatkan nama lengkap
+          // Fetch profil untuk mendapatkan nama lengkap dan role
           const response = await fetch(`${import.meta.env.VITE_API_URL}/profiles/${session.user.id}`);
           if (response.ok) {
             const profile = await response.json();
             setName(profile.full_name || profile.display_name || '');
+            if (profile.role === 'admin') {
+              setIsAdmin(true);
+            }
           }
         }
       } catch (error) {
@@ -111,6 +115,27 @@ export default function EventDetails() {
     }
   };
 
+  const handleDeleteEvent = async () => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus event ini? Semua data pesanan yang terkait juga akan terhapus.')) return;
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/events/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        alert('Event berhasil dihapus.');
+        navigate('/');
+      } else {
+        const err = await response.json();
+        alert('Gagal menghapus event: ' + err.error);
+      }
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      alert('Terjadi kesalahan koneksi.');
+    }
+  };
+
   if (loading) return <div className="flex justify-center items-center min-h-screen"><Loader2 className="animate-spin w-10 h-10 text-blue-600" /></div>;
   if (!event) return <div className="text-center py-20 text-xl">Event tidak ditemukan.</div>;
 
@@ -127,6 +152,11 @@ export default function EventDetails() {
                 className="w-full h-full object-cover"
               />
               <div className="absolute top-4 right-4 flex gap-2">
+                {isAdmin && (
+                  <button onClick={handleDeleteEvent} className="bg-white/80 backdrop-blur p-2 rounded-full hover:bg-red-50 text-red-600 transition-colors" title="Hapus Event (Admin)">
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                )}
                 <button className="bg-white/80 backdrop-blur p-2 rounded-full hover:bg-white text-gray-700 transition-colors">
                   <Share2 className="w-5 h-5" />
                 </button>
