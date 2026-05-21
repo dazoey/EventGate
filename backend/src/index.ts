@@ -71,7 +71,7 @@ app.get('/api/events/:id', async (req: Request, res: Response) => {
 // Create new event
 app.post('/api/events', upload.single('image'), async (req: Request, res: Response): Promise<any> => {
   try {
-    const { title, description, date, location, price, ticket_quota } = req.body;
+    const { title, description, date, location, price, ticket_quota, organizer_id } = req.body;
     let imageUrl = null;
 
     if (req.file) {
@@ -87,7 +87,8 @@ app.post('/api/events', upload.single('image'), async (req: Request, res: Respon
 
     const { data, error } = await supabase.from('events').insert([{
       title, description, date, location, price: parseFloat(price), image_url: imageUrl,
-      ticket_quota: ticket_quota ? parseInt(ticket_quota, 10) : 0
+      ticket_quota: ticket_quota ? parseInt(ticket_quota, 10) : 0,
+      organizer_id: organizer_id || null
     }]).select();
 
     if (error) throw error;
@@ -163,6 +164,106 @@ app.get('/api/admin/bookings', async (req: Request, res: Response) => {
 app.patch('/api/admin/bookings/:id', async (req: Request, res: Response) => {
   try {
     const { status } = req.body;
+    const { data, error } = await supabase.from('bookings').update({ status }).eq('id', req.params.id).select();
+    if (error) throw error;
+    res.json(data[0]);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Organizer: Get dashboard stats and bookings
+app.get('/api/organizer/:organizer_id/dashboard', async (req: Request, res: Response) => {
+  try {
+    const { organizer_id } = req.params;
+
+    // 1. Get all events created by this organizer
+    const { data: eventsData, error: eventsError } = await supabase
+      .from('events')
+      .select('*')
+      .eq('organizer_id', organizer_id);
+
+    if (eventsError) throw eventsError;
+    if (!eventsData || eventsData.length === 0) {
+      return res.json({ events: [], bookings: [], stats: { totalTicketsSold: 0, totalRevenue: 0, dailyRevenue: [] } });
+    }
+
+    const eventIds = eventsData.map(e => e.id);
+
+    // 2. Get all bookings for these events
+    const { data: bookingsData, error: bookingsError } = await supabase
+      .from('bookings')
+      .select('*, events(title, price)')
+      .in('event_id', eventIds)
+      .order('created_at', { ascending: false });
+
+    if (bookingsError) throw bookingsError;
+
+    // 3. Calculate Stats
+    let totalTicketsSold = 0;
+    let totalRevenue = 0;
+    const revenueByDate: Record<string, number> = {};
+
+    bookingsData?.forEach(booking => {
+      if (booking.status === 'confirmed') {
+        totalTicketsSold += booking.quantity;
+        const revenue = booking.quantity * (booking.events?.price || 0);
+        totalRevenue += revenue;
+
+        const date = new Date(booking.created_at).toISOString().split('T')[0];
+        if (!revenueByDate[date]) {
+          revenueByDate[date] = 0;
+        }
+        revenueByDate[date] += revenue;
+      }
+    });
+
+    const dailyRevenue = Object.keys(revenueByDate).map(date => ({
+      date,
+      revenue: revenueByDate[date]
+    })).sort((a, b) => a.date.localeCompare(b.date));
+
+    res.json({
+      events: eventsData,
+      bookings: bookingsData,
+      stats: {
+        totalTicketsSold,
+        totalRevenue,
+        dailyRevenue
+      }
+    });
+  } catch (error: any) {
+    console.error('Error fetching organizer dashboard data:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Organizer: Update booking status for their events
+app.patch('/api/organizer/bookings/:id', async (req: Request, res: Response) => {
+  try {
+    const { status, organizer_id } = req.body; // Need to verify if the event belongs to this organizer, but since we trust the client to an extent or we can query it
+
+    // Optional: Verify if the booking belongs to an event of the organizer
+    const { data: bookingData, error: bookingError } = await supabase
+      .from('bookings')
+      .select('event_id')
+      .eq('id', req.params.id)
+      .single();
+
+    if (bookingError) throw bookingError;
+
+    const { data: eventData, error: eventError } = await supabase
+      .from('events')
+      .select('organizer_id')
+      .eq('id', bookingData.event_id)
+      .single();
+
+    if (eventError) throw eventError;
+
+    if (eventData.organizer_id !== organizer_id) {
+       return res.status(403).json({ error: 'Unauthorized to update this booking' });
+    }
+
     const { data, error } = await supabase.from('bookings').update({ status }).eq('id', req.params.id).select();
     if (error) throw error;
     res.json(data[0]);

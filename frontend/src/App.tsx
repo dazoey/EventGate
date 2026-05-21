@@ -8,6 +8,7 @@ import CreateEvent from './pages/CreateEvent';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Help from './pages/Help';
+import OrganizerDashboard from './pages/OrganizerDashboard';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 
@@ -26,6 +27,7 @@ function App() {
           <Route path="/bantuan" element={<Help />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/create-event" element={<CreateEvent />} />
+          <Route path="/organizer" element={<OrganizerDashboard />} />
           <Route path="*" element={<div className="p-10 text-center">Halaman Tidak Ditemukan (404)</div>} />
         </Routes>
       </main>

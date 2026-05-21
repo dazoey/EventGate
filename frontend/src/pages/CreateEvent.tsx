@@ -33,6 +33,7 @@ export default function CreateEvent() {
   const today = new Date();
 
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -44,27 +45,13 @@ export default function CreateEvent() {
     document.addEventListener('mousedown', handler);
 
     import('../lib/supabase').then(({ supabase }) => {
-      supabase.auth.getSession().then(async ({ data: { session } }) => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
         if (!session?.user) {
           setIsAuthorized(false);
           return;
         }
-        
-        try {
-          const profileRes = await fetch(`${import.meta.env.VITE_API_URL}/profiles/${session.user.id}`);
-          if (profileRes.ok) {
-            const profileData = await profileRes.json();
-            if (profileData.role === 'admin' || profileData.role === 'event_organizer') {
-              setIsAuthorized(true);
-            } else {
-              setIsAuthorized(false);
-            }
-          } else {
-            setIsAuthorized(false);
-          }
-        } catch {
-          setIsAuthorized(false);
-        }
+        setUserId(session.user.id);
+        setIsAuthorized(true);
       });
     });
 
@@ -78,7 +65,7 @@ export default function CreateEvent() {
           <Type className="w-8 h-8" />
         </div>
         <h2 className="text-2xl font-bold">Akses Ditolak</h2>
-        <p className="text-gray-500">Hanya Event Organizer yang dapat membuat event.</p>
+        <p className="text-gray-500">Silakan login terlebih dahulu untuk membuat event Anda sendiri.</p>
       </div>
     );
   }
@@ -151,6 +138,7 @@ export default function CreateEvent() {
     data.append('location', formData.location);
     data.append('price', formData.price);
     data.append('ticket_quota', formData.ticket_quota);
+    if (userId) data.append('organizer_id', userId);
     if (image) data.append('image', image);
 
     try {
