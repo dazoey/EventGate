@@ -26,21 +26,56 @@ export default function AdminDashboard() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
   const fetchBookings = async () => {
     try {
-      // In a real app, this should be authenticated
       const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/bookings`);
       const data = await response.json();
-      setBookings(data);
+      if (Array.isArray(data)) {
+        setBookings(data);
+      } else {
+        console.error('Invalid bookings data:', data);
+        setBookings([]);
+      }
     } catch (error) {
       console.error('Error fetching bookings:', error);
+      setBookings([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchBookings();
+    import('../lib/supabase').then(({ supabase }) => {
+      supabase.auth.getSession().then(async ({ data: { session } }) => {
+        if (!session?.user) {
+          setIsAdmin(false);
+          setLoading(false);
+          return;
+        }
+        
+        try {
+          const profileRes = await fetch(`${import.meta.env.VITE_API_URL}/profiles/${session.user.id}`);
+          if (profileRes.ok) {
+            const profileData = await profileRes.json();
+            if (profileData.role === 'admin') {
+              setIsAdmin(true);
+              fetchBookings();
+            } else {
+              setIsAdmin(false);
+              setLoading(false);
+            }
+          } else {
+            setIsAdmin(false);
+            setLoading(false);
+          }
+        } catch {
+          setIsAdmin(false);
+          setLoading(false);
+        }
+      });
+    });
   }, []);
 
   const updateStatus = async (id: string, status: string) => {
@@ -165,6 +200,16 @@ export default function AdminDashboard() {
   };
 
   if (loading) return <div className="flex justify-center items-center min-h-screen"><Loader2 className="animate-spin w-10 h-10 text-blue-600" /></div>;
+
+  if (isAdmin === false) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <XCircle className="w-16 h-16 text-red-500 mb-4" />
+        <h2 className="text-2xl font-bold">Akses Ditolak</h2>
+        <p className="text-gray-500">Hanya administrator yang dapat mengakses halaman ini.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto py-10 px-6">

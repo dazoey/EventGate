@@ -32,6 +32,8 @@ export default function CreateEvent() {
 
   const today = new Date();
 
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (calendarRef.current && !calendarRef.current.contains(e.target as Node)) {
@@ -40,8 +42,50 @@ export default function CreateEvent() {
       }
     };
     document.addEventListener('mousedown', handler);
+
+    import('../lib/supabase').then(({ supabase }) => {
+      supabase.auth.getSession().then(async ({ data: { session } }) => {
+        if (!session?.user) {
+          setIsAuthorized(false);
+          return;
+        }
+        
+        try {
+          const profileRes = await fetch(`${import.meta.env.VITE_API_URL}/profiles/${session.user.id}`);
+          if (profileRes.ok) {
+            const profileData = await profileRes.json();
+            if (profileData.role === 'admin' || profileData.role === 'event_organizer') {
+              setIsAuthorized(true);
+            } else {
+              setIsAuthorized(false);
+            }
+          } else {
+            setIsAuthorized(false);
+          }
+        } catch {
+          setIsAuthorized(false);
+        }
+      });
+    });
+
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  if (isAuthorized === false) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4">
+          <Type className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-bold">Akses Ditolak</h2>
+        <p className="text-gray-500">Hanya Event Organizer yang dapat membuat event.</p>
+      </div>
+    );
+  }
+
+  if (isAuthorized === null) {
+    return <div className="flex justify-center items-center min-h-screen"><Loader2 className="animate-spin w-10 h-10 text-blue-600" /></div>;
+  }
 
   // Sync state sementara saat picker dibuka
   const openMonthYearPicker = () => {

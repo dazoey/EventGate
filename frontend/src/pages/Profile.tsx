@@ -7,6 +7,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 interface ProfileData {
   full_name: string;
   display_name: string;
+  role?: string;
 }
 
 interface Booking {
@@ -99,6 +100,19 @@ export default function Profile() {
               <div className="flex items-center justify-center gap-2 text-gray-400 text-sm mt-4">
                 <Mail className="w-4 h-4" />
                 <span className="font-medium">{user?.email}</span>
+              </div>
+              
+              <div className="mt-4 flex flex-col items-center gap-2">
+                {profile?.role === 'admin' && (
+                  <span className="bg-blue-100 text-blue-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-blue-200 shadow-sm">
+                    Admin
+                  </span>
+                )}
+                {profile?.role === 'event_organizer' && (
+                  <span className="bg-green-100 text-green-700 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-green-200 shadow-sm">
+                    Event Organizer
+                  </span>
+                )}
               </div>
               
               <div className="mt-8 flex items-center justify-center gap-2 text-[10px] font-black text-green-600 bg-green-50 w-fit mx-auto px-4 py-2 rounded-full uppercase tracking-[0.2em] border border-green-100">
