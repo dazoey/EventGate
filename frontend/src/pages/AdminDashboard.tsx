@@ -263,7 +263,7 @@ export default function AdminDashboard() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                 <XAxis dataKey="date" tick={{fontSize: 12}} tickLine={false} axisLine={{stroke: '#e5e7eb'}} />
                 <YAxis tickFormatter={(val) => `Rp${val/1000}k`} tick={{fontSize: 12}} tickLine={false} axisLine={false} />
-                <Tooltip formatter={(value: number | string) => formatRupiah(Number(value) || 0)} />
+                <Tooltip formatter={(value: any) => formatRupiah(Number(value) || 0)} />
                 <Line type="monotone" dataKey="revenue" stroke="#2563eb" strokeWidth={3} dot={{r: 4, fill: '#2563eb', strokeWidth: 2, stroke: '#fff'}} activeDot={{r: 6}} />
               </LineChart>
             </ResponsiveContainer>

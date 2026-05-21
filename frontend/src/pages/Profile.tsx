@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { User, Ticket, Calendar, MapPin, Clock, Loader2, Mail, ShieldCheck, X, CheckCircle2 } from 'lucide-react';
+import { User, Ticket, Calendar, MapPin, Clock, Loader2, Mail, ShieldCheck, X } from 'lucide-react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface ProfileData {
