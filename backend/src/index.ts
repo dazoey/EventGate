@@ -132,6 +132,36 @@ app.get('/api/events/:id/sold', async (req: Request, res: Response) => {
 app.post('/api/bookings', upload.single('paymentProof'), async (req: Request, res: Response): Promise<any> => {
   try {
     const { event_id, user_email, user_name, ticket_category, quantity } = req.body;
+    const requestedQuantity = parseInt(quantity, 10);
+
+    // 1. Dapatkan detail event untuk mengetahui kuota total
+    const { data: eventData, error: eventError } = await supabase
+      .from('events')
+      .select('ticket_quota')
+      .eq('id', event_id)
+      .single();
+
+    if (eventError || !eventData) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    // 2. Hitung jumlah tiket yang sudah terjual (status confirmed dan pending)
+    // Menghitung status pending juga untuk menghindari double-booking bersamaan
+    const { data: soldData, error: soldError } = await supabase
+      .from('bookings')
+      .select('quantity')
+      .eq('event_id', event_id)
+      .in('status', ['confirmed', 'pending']);
+
+    if (soldError) throw soldError;
+
+    const totalSoldOrPending = (soldData || []).reduce((sum: number, b: any) => sum + (b.quantity || 0), 0);
+    const remainingTickets = eventData.ticket_quota - totalSoldOrPending;
+
+    if (requestedQuantity > remainingTickets) {
+      return res.status(400).json({ error: `Maaf, tiket tidak mencukupi. Sisa tiket: ${remainingTickets > 0 ? remainingTickets : 0}` });
+    }
+
     let paymentProofUrl = null;
     
     if (req.file) {
@@ -147,7 +177,7 @@ app.post('/api/bookings', upload.single('paymentProof'), async (req: Request, re
 
     const { data, error } = await supabase.from('bookings').insert([{
       event_id, user_email, user_name, ticket_category, 
-      quantity: parseInt(quantity, 10), 
+      quantity: requestedQuantity, 
       payment_proof_url: paymentProofUrl,
       status: 'pending'
     }]).select();

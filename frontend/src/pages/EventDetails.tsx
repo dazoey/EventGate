@@ -251,7 +251,14 @@ export default function EventDetails() {
               
               <div>
                 <label className="block text-sm text-gray-300 mb-1">Jumlah</label>
-                <input type="number" min="1" value={quantity} onChange={(e) => setQuantity(parseInt(e.target.value))} className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-white" />
+                <input 
+                  type="number" 
+                  min="1" 
+                  max={event.ticket_quota > 0 ? Math.max(0, event.ticket_quota - soldTickets) : undefined}
+                  value={quantity} 
+                  onChange={(e) => setQuantity(parseInt(e.target.value) || 1)} 
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-white" 
+                />
               </div>
 
               <div className="pt-2">
@@ -268,11 +275,13 @@ export default function EventDetails() {
 
               <button 
                 type="submit" 
-                disabled={bookingLoading}
+                disabled={bookingLoading || (event.ticket_quota > 0 && (event.ticket_quota - soldTickets) <= 0)}
                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-bold py-3 rounded-lg mt-6 transition-colors shadow-lg flex justify-center items-center gap-2"
               >
                 {bookingLoading && <Loader2 className="animate-spin w-5 h-5" />}
-                {bookingLoading ? 'Memproses...' : 'Pesan Tiket Sekarang'}
+                {event.ticket_quota > 0 && (event.ticket_quota - soldTickets) <= 0 
+                  ? 'Tiket Habis' 
+                  : bookingLoading ? 'Memproses...' : 'Pesan Tiket Sekarang'}
               </button>
             </form>
           </div>
