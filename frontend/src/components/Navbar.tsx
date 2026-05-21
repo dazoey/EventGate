@@ -75,6 +75,13 @@ export default function Navbar() {
           <Link to="/pengaturan" className="hover:text-pink-500 transition-colors">Pengaturan</Link>
           <Link to="/bantuan" className="hover:text-pink-500 transition-colors">Bantuan</Link>
           
+          {profile?.role === 'admin' && (
+            <Link to="/admin" className="hover:text-pink-500 transition-colors text-blue-400">Admin</Link>
+          )}
+          {(profile?.role === 'event_organizer' || profile?.role === 'admin') && (
+            <Link to="/admin/create-event" className="hover:text-pink-500 transition-colors text-green-400">Buat Event</Link>
+          )}
+          
           {user ? (
             <div className="flex items-center gap-6 pl-6 border-l border-white/10">
               <div className="flex items-center gap-2 text-blue-400">
@@ -109,6 +116,18 @@ export default function Navbar() {
              <span className="text-lg font-bold uppercase group-hover:text-pink-500">Pengaturan</span>
              <Menu className="w-5 h-5 text-gray-400" />
           </Link>
+          {profile?.role === 'admin' && (
+            <Link to="/admin" className="flex items-center justify-between py-2" onClick={() => setIsMenuOpen(false)}>
+               <span className="text-lg font-bold uppercase group-hover:text-pink-500 text-blue-400">Admin Dashboard</span>
+               <UserIcon className="w-5 h-5 text-blue-400" />
+            </Link>
+          )}
+          {(profile?.role === 'event_organizer' || profile?.role === 'admin') && (
+            <Link to="/admin/create-event" className="flex items-center justify-between py-2" onClick={() => setIsMenuOpen(false)}>
+               <span className="text-lg font-bold uppercase group-hover:text-pink-500 text-green-400">Buat Event</span>
+               <Ticket className="w-5 h-5 text-green-400" />
+            </Link>
+          )}
           <div className="h-px bg-white/5 my-2"></div>
           {user ? (
             <div className="flex flex-col gap-6">
