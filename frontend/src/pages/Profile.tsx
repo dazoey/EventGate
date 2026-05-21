@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { User, Ticket, Calendar, MapPin, Clock, Loader2, Mail, ShieldCheck } from 'lucide-react';
+import { User, Ticket, Calendar, MapPin, Clock, Loader2, Mail, ShieldCheck, X, CheckCircle2 } from 'lucide-react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface ProfileData {
@@ -28,6 +28,7 @@ export default function Profile() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -148,7 +149,11 @@ export default function Profile() {
           ) : (
             <div className="space-y-8">
               {bookings.map((booking) => (
-                <div key={booking.id} className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden flex flex-col md:flex-row hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                <div 
+                  key={booking.id} 
+                  onClick={() => setSelectedBooking(booking)}
+                  className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden flex flex-col md:flex-row hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+                >
                   <div className="w-full md:w-56 h-40 md:h-auto overflow-hidden">
                     <img 
                       src={booking.events?.image_url || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4'} 
@@ -194,6 +199,104 @@ export default function Profile() {
         </div>
 
       </div>
+
+      {/* Ticket Detail Modal */}
+      {selectedBooking && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-[#0f172a]/60 backdrop-blur-sm" onClick={() => setSelectedBooking(null)}></div>
+          
+          <div className="relative w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+            {/* Header / Event Image */}
+            <div className="h-48 relative">
+              <img 
+                src={selectedBooking.events?.image_url || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4'} 
+                alt={selectedBooking.events?.title}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+              
+              <button 
+                onClick={() => setSelectedBooking(null)}
+                className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-full flex items-center justify-center text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              
+              <div className="absolute bottom-6 left-6 right-6">
+                <div className={`inline-flex px-3 py-1 mb-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] backdrop-blur-md shadow-sm ${
+                    selectedBooking.status === 'confirmed' ? 'bg-green-500/90 text-white' : 
+                    selectedBooking.status === 'rejected' ? 'bg-red-500/90 text-white' : 'bg-amber-500/90 text-white'
+                  }`}>
+                    {selectedBooking.status}
+                </div>
+                <h3 className="font-black text-white text-2xl leading-tight uppercase tracking-tight line-clamp-2">
+                  {selectedBooking.events?.title}
+                </h3>
+              </div>
+            </div>
+
+            {/* Ticket Info */}
+            <div className="p-8 pb-10 bg-white relative">
+              {/* Decorative cutout effect */}
+              <div className="absolute -top-4 -left-4 w-8 h-8 bg-[#0f172a]/60 backdrop-blur-sm rounded-full"></div>
+              <div className="absolute -top-4 -right-4 w-8 h-8 bg-[#0f172a]/60 backdrop-blur-sm rounded-full"></div>
+              
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b border-dashed border-gray-200 pb-6">
+                  <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Kategori</p>
+                    <p className="font-bold text-gray-900 uppercase text-lg">{selectedBooking.ticket_category}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Jumlah</p>
+                    <p className="font-bold text-pink-600 text-2xl">{selectedBooking.quantity} <span className="text-sm text-gray-900">Tiket</span></p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Calendar className="w-4 h-4 text-blue-500" />
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tanggal</p>
+                    </div>
+                    <p className="font-bold text-gray-900 text-sm">{selectedBooking.events?.date}</p>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Clock className="w-4 h-4 text-pink-500" />
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Waktu Pesan</p>
+                    </div>
+                    <p className="font-bold text-gray-900 text-sm">{new Date(selectedBooking.created_at).toLocaleDateString('id-ID')}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <MapPin className="w-4 h-4 text-green-500" />
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Lokasi</p>
+                  </div>
+                  <p className="font-bold text-gray-900 text-sm">{selectedBooking.events?.location}</p>
+                </div>
+                
+                <div className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-center gap-2">
+                   <div className="w-full h-12 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden">
+                      {/* Fake barcode pattern */}
+                      <div className="flex h-8 w-full px-4 gap-1 opacity-40">
+                         {Array.from({ length: 30 }).map((_, i) => (
+                           <div key={i} className="h-full bg-gray-900" style={{ width: `${Math.max(1, Math.random() * 4)}px` }}></div>
+                         ))}
+                      </div>
+                   </div>
+                </div>
+                <div className="text-center mt-2">
+                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Booking ID</p>
+                   <p className="font-mono text-xs font-bold text-gray-600 mt-0.5">{selectedBooking.id}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
