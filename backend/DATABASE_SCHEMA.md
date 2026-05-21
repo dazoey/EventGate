@@ -19,8 +19,12 @@ CREATE TABLE IF NOT EXISTS events (
   price DECIMAL NOT NULL DEFAULT 0,
   ticket_quota INTEGER NOT NULL DEFAULT 0,
   image_url TEXT,
+  organizer_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- MIGRATION: If you already have the events table, run this:
+-- ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_id UUID REFERENCES profiles(id) ON DELETE SET NULL;
 
 -- Table: bookings
 -- Stores ticket sales and manual payment confirmations

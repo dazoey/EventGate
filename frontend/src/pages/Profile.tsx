@@ -120,6 +120,15 @@ export default function Profile() {
                 Account Verified
               </div>
 
+              <div className="mt-6 flex flex-col gap-3 px-4">
+                 <button 
+                   onClick={() => navigate('/organizer')}
+                   className="w-full bg-blue-50 text-blue-600 border border-blue-100 py-3 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-blue-100 transition-colors shadow-sm"
+                 >
+                   Dashboard Organizer
+                 </button>
+              </div>
+
               <div className="mt-10 pt-8 border-t border-gray-50 space-y-4">
                 <div className="flex justify-between items-center text-xs font-bold uppercase tracking-widest">
                   <span className="text-gray-300">Member Since</span>
