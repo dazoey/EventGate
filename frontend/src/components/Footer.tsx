@@ -1,4 +1,5 @@
 import { Ticket } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function Footer() {
   return (
@@ -14,22 +15,14 @@ export default function Footer() {
           </p>
         </div>
         
-        <div>
-          <h4 className="font-semibold mb-4">Plan Events</h4>
-          <ul className="space-y-2 text-sm text-gray-400">
-            <li><a href="#" className="hover:text-white">Create and Set Up</a></li>
-            <li><a href="#" className="hover:text-white">Sell Tickets</a></li>
-            <li><a href="#" className="hover:text-white">Online RSVP</a></li>
-            <li><a href="#" className="hover:text-white">Online Events</a></li>
-          </ul>
-        </div>
+        
         
         <div>
           <h4 className="font-semibold mb-4">EventGate</h4>
           <ul className="space-y-2 text-sm text-gray-400">
-            <li><a href="#" className="hover:text-white">About Us</a></li>
+            <li><Link to="/bantuan" className="hover:text-white">About Us</Link></li>
 
-            <li><a href="#" className="hover:text-white">Contact Us</a></li>
+            <li><Link to="/bantuan" className="hover:text-white">Contact Us</Link></li>
           </ul>
         </div>
         
