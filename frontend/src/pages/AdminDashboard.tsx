@@ -15,6 +15,8 @@ interface Booking {
   status: string;
   created_at: string;
   event_id: string;
+  cancellation_reason?: string;
+  cancellation_proof_url?: string;
   events?: { title: string; price?: number };
 }
 
@@ -325,36 +327,71 @@ export default function AdminDashboard() {
                     <div className="text-xs text-gray-500">{booking.ticket_category} x {booking.quantity}</div>
                   </td>
                   <td className="px-6 py-4">
-                    {booking.payment_proof_url ? (
-                      <a href={booking.payment_proof_url} target="_blank" rel="noreferrer" className="text-blue-600 flex items-center gap-1 text-xs hover:underline">
-                        <Eye className="w-3 h-3" /> Lihat Bukti
+                    {booking.payment_proof_url && (
+                      <a href={booking.payment_proof_url} target="_blank" rel="noreferrer" className="text-blue-600 flex items-center gap-1 text-xs hover:underline mb-1">
+                        <Eye className="w-3 h-3" /> Bukti Bayar
                       </a>
-                    ) : <span className="text-xs text-gray-400">Tidak ada</span>}
+                    )}
+                    {booking.status === 'cancellation_requested' && (
+                      <div className="mt-2 bg-orange-50 p-2 rounded border border-orange-100 min-w-[120px]">
+                         <div className="text-[10px] font-bold text-orange-800 uppercase">Alasan Batal:</div>
+                         <p className="text-xs text-orange-900 mt-0.5 whitespace-normal break-words max-w-[200px]">{booking.cancellation_reason || 'Tidak ada alasan'}</p>
+                         {booking.cancellation_proof_url && (
+                           <a href={booking.cancellation_proof_url} target="_blank" rel="noreferrer" className="text-orange-600 flex items-center gap-1 text-[10px] hover:underline mt-1 font-bold">
+                             <Eye className="w-3 h-3" /> Bukti Batal
+                           </a>
+                         )}
+                      </div>
+                    )}
+                    {!booking.payment_proof_url && booking.status !== 'cancellation_requested' && <span className="text-xs text-gray-400">Tidak ada</span>}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                       booking.status === 'confirmed' ? 'bg-green-100 text-green-700' : 
-                      booking.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                      booking.status === 'rejected' || booking.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                      booking.status === 'cancellation_requested' ? 'bg-orange-100 text-orange-700' :
+                      'bg-yellow-100 text-yellow-700'
                     }`}>
-                      {booking.status}
+                      {booking.status === 'cancellation_requested' ? 'Cancel Req' : booking.status}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <button 
-                        onClick={() => updateStatus(booking.id, 'confirmed')}
-                        className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                        title="Konfirmasi"
-                      >
-                        <CheckCircle className="w-5 h-5" />
-                      </button>
-                      <button 
-                        onClick={() => updateStatus(booking.id, 'rejected')}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Tolak"
-                      >
-                        <XCircle className="w-5 h-5" />
-                      </button>
+                      {booking.status === 'cancellation_requested' ? (
+                        <>
+                          <button 
+                            onClick={() => updateStatus(booking.id, 'cancelled')}
+                            className="text-[10px] px-2 py-1 bg-red-100 text-red-600 hover:bg-red-200 rounded font-bold uppercase tracking-wider transition-colors"
+                            title="Setujui Batal"
+                          >
+                            Setujui Batal
+                          </button>
+                          <button 
+                            onClick={() => updateStatus(booking.id, 'confirmed')}
+                            className="text-[10px] px-2 py-1 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded font-bold uppercase tracking-wider transition-colors"
+                            title="Tolak Batal"
+                          >
+                            Tolak Batal
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button 
+                            onClick={() => updateStatus(booking.id, 'confirmed')}
+                            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Konfirmasi"
+                          >
+                            <CheckCircle className="w-5 h-5" />
+                          </button>
+                          <button 
+                            onClick={() => updateStatus(booking.id, 'rejected')}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Tolak"
+                          >
+                            <XCircle className="w-5 h-5" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

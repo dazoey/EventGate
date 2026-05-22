@@ -30,7 +30,48 @@ export default function Profile() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelProof, setCancelProof] = useState<File | null>(null);
   const navigate = useNavigate();
+
+  const handleCancelBooking = async () => {
+    if (!selectedBooking) return;
+    if (!cancelReason) {
+       alert("Alasan pembatalan wajib diisi.");
+       return;
+    }
+    setCancelLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('reason', cancelReason);
+      if (cancelProof) {
+        formData.append('proof', cancelProof);
+      }
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/bookings/${selectedBooking.id}/cancel-request`, {
+        method: 'PATCH',
+        body: formData,
+      });
+      
+      if (res.ok) {
+        // Update local state
+        setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, status: 'cancellation_requested' } : b));
+        setSelectedBooking({ ...selectedBooking, status: 'cancellation_requested' });
+        setShowCancelConfirm(false);
+        setCancelReason('');
+        setCancelProof(null);
+      } else {
+        alert('Gagal membatalkan pesanan.');
+      }
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      alert('Terjadi kesalahan.');
+    } finally {
+      setCancelLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -315,7 +356,67 @@ export default function Profile() {
                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Booking ID</p>
                    <p className="font-mono text-xs font-bold text-gray-600 mt-0.5">{selectedBooking.id}</p>
                 </div>
+                
+                {(selectedBooking.status === 'pending' || selectedBooking.status === 'confirmed') && (
+                  <button 
+                    onClick={() => setShowCancelConfirm(true)}
+                    className="w-full mt-4 bg-red-50 text-red-600 border border-red-100 py-3 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-red-100 transition-colors shadow-sm"
+                  >
+                    Batalkan Pesanan
+                  </button>
+                )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Confirmation Modal */}
+      {showCancelConfirm && selectedBooking && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-[#0f172a]/60 backdrop-blur-sm" onClick={() => !cancelLoading && setShowCancelConfirm(false)}></div>
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 text-left animate-in fade-in zoom-in-95 duration-300">
+            <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-2 text-center">Batalkan Pesanan?</h3>
+            <p className="text-sm text-gray-500 mb-4 text-center">Berikan alasan dan bukti (opsional) mengapa Anda ingin membatalkan pesanan ini.</p>
+            
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-widest mb-1">Alasan Pembatalan *</label>
+                <textarea 
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                  rows={3}
+                  placeholder="Masukkan alasan Anda..."
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-widest mb-1">Bukti / Foto Pendukung (Opsional)</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={(e) => setCancelProof(e.target.files?.[0] || null)}
+                  className="w-full border border-gray-200 rounded-xl p-2 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setShowCancelConfirm(false)}
+                disabled={cancelLoading}
+                className="flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50"
+              >
+                Kembali
+              </button>
+              <button 
+                onClick={handleCancelBooking}
+                disabled={cancelLoading || !cancelReason}
+                className="flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-red-600 text-white hover:bg-red-700 flex justify-center items-center gap-2 disabled:opacity-50"
+              >
+                {cancelLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Kirim Permintaan'}
+              </button>
             </div>
           </div>
         </div>
