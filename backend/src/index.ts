@@ -332,6 +332,44 @@ app.get('/api/bookings/user/:email', async (req: Request, res: Response) => {
   }
 });
 
+// User: Request cancellation for a booking
+app.patch('/api/bookings/:id/cancel-request', upload.single('proof'), async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { reason } = req.body;
+    let proofUrl = null;
+
+    if (req.file) {
+      const fileName = `cancellations/${Date.now()}-${req.file.originalname}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('eventgate-bucket')
+        .upload(fileName, req.file.buffer, { contentType: req.file.mimetype });
+
+      if (uploadError) throw uploadError;
+      const { data: publicUrlData } = supabase.storage.from('eventgate-bucket').getPublicUrl(fileName);
+      proofUrl = publicUrlData.publicUrl;
+    }
+
+    const { data, error } = await supabase
+      .from('bookings')
+      .update({ 
+        status: 'cancellation_requested',
+        cancellation_reason: reason || null,
+        cancellation_proof_url: proofUrl
+      })
+      .eq('id', req.params.id)
+      .select();
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    res.json({ message: 'Cancellation requested successfully', booking: data[0] });
+  } catch (error: any) {
+    console.error('Error requesting cancellation:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Profile: Get user profile
 app.get('/api/profiles/:id', async (req: Request, res: Response) => {
   try {

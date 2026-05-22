@@ -62,10 +62,23 @@ app.get('/api/events/:id', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// Admin: Delete event
+app.delete('/api/events/:id', async (req, res) => {
+    try {
+        const { error } = await supabase.from('events').delete().eq('id', req.params.id);
+        if (error)
+            throw error;
+        res.json({ message: 'Event deleted successfully' });
+    }
+    catch (error) {
+        console.error('Error deleting event:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 // Create new event
 app.post('/api/events', upload.single('image'), async (req, res) => {
     try {
-        const { title, description, date, location, price } = req.body;
+        const { title, description, date, location, price, ticket_quota, organizer_id } = req.body;
         let imageUrl = null;
         if (req.file) {
             const fileName = `events/${Date.now()}-${req.file.originalname}`;
@@ -78,7 +91,9 @@ app.post('/api/events', upload.single('image'), async (req, res) => {
             imageUrl = publicUrlData.publicUrl;
         }
         const { data, error } = await supabase.from('events').insert([{
-                title, description, date, location, price: parseFloat(price), image_url: imageUrl
+                title, description, date, location, price: parseFloat(price), image_url: imageUrl,
+                ticket_quota: ticket_quota ? parseInt(ticket_quota, 10) : 0,
+                organizer_id: organizer_id || null
             }]).select();
         if (error)
             throw error;
@@ -89,9 +104,51 @@ app.post('/api/events', upload.single('image'), async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// Get sold tickets count for an event
+app.get('/api/events/:id/sold', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('bookings')
+            .select('quantity')
+            .eq('event_id', req.params.id)
+            .eq('status', 'confirmed');
+        if (error)
+            throw error;
+        const sold = (data || []).reduce((sum, b) => sum + (b.quantity || 0), 0);
+        res.json({ sold });
+    }
+    catch (error) {
+        console.error('Error fetching sold tickets:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 app.post('/api/bookings', upload.single('paymentProof'), async (req, res) => {
     try {
         const { event_id, user_email, user_name, ticket_category, quantity } = req.body;
+        const requestedQuantity = parseInt(quantity, 10);
+        // 1. Dapatkan detail event untuk mengetahui kuota total
+        const { data: eventData, error: eventError } = await supabase
+            .from('events')
+            .select('ticket_quota')
+            .eq('id', event_id)
+            .single();
+        if (eventError || !eventData) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+        // 2. Hitung jumlah tiket yang sudah terjual (status confirmed dan pending)
+        // Menghitung status pending juga untuk menghindari double-booking bersamaan
+        const { data: soldData, error: soldError } = await supabase
+            .from('bookings')
+            .select('quantity')
+            .eq('event_id', event_id)
+            .in('status', ['confirmed', 'pending']);
+        if (soldError)
+            throw soldError;
+        const totalSoldOrPending = (soldData || []).reduce((sum, b) => sum + (b.quantity || 0), 0);
+        const remainingTickets = eventData.ticket_quota - totalSoldOrPending;
+        if (requestedQuantity > remainingTickets) {
+            return res.status(400).json({ error: `Maaf, tiket tidak mencukupi. Sisa tiket: ${remainingTickets > 0 ? remainingTickets : 0}` });
+        }
         let paymentProofUrl = null;
         if (req.file) {
             const fileName = `proofs/${Date.now()}-${req.file.originalname}`;
@@ -105,7 +162,7 @@ app.post('/api/bookings', upload.single('paymentProof'), async (req, res) => {
         }
         const { data, error } = await supabase.from('bookings').insert([{
                 event_id, user_email, user_name, ticket_category,
-                quantity: parseInt(quantity, 10),
+                quantity: requestedQuantity,
                 payment_proof_url: paymentProofUrl,
                 status: 'pending'
             }]).select();
@@ -122,7 +179,7 @@ app.get('/api/admin/bookings', async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('bookings')
-            .select('*, events(title)')
+            .select('*, events(title, price)')
             .order('created_at', { ascending: false });
         if (error)
             throw error;
@@ -136,6 +193,95 @@ app.get('/api/admin/bookings', async (req, res) => {
 app.patch('/api/admin/bookings/:id', async (req, res) => {
     try {
         const { status } = req.body;
+        const { data, error } = await supabase.from('bookings').update({ status }).eq('id', req.params.id).select();
+        if (error)
+            throw error;
+        res.json(data[0]);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+// Organizer: Get dashboard stats and bookings
+app.get('/api/organizer/:organizer_id/dashboard', async (req, res) => {
+    try {
+        const { organizer_id } = req.params;
+        // 1. Get all events created by this organizer
+        const { data: eventsData, error: eventsError } = await supabase
+            .from('events')
+            .select('*')
+            .eq('organizer_id', organizer_id);
+        if (eventsError)
+            throw eventsError;
+        if (!eventsData || eventsData.length === 0) {
+            return res.json({ events: [], bookings: [], stats: { totalTicketsSold: 0, totalRevenue: 0, dailyRevenue: [] } });
+        }
+        const eventIds = eventsData.map(e => e.id);
+        // 2. Get all bookings for these events
+        const { data: bookingsData, error: bookingsError } = await supabase
+            .from('bookings')
+            .select('*, events(title, price)')
+            .in('event_id', eventIds)
+            .order('created_at', { ascending: false });
+        if (bookingsError)
+            throw bookingsError;
+        // 3. Calculate Stats
+        let totalTicketsSold = 0;
+        let totalRevenue = 0;
+        const revenueByDate = {};
+        bookingsData?.forEach(booking => {
+            if (booking.status === 'confirmed') {
+                totalTicketsSold += booking.quantity;
+                const revenue = booking.quantity * (booking.events?.price || 0);
+                totalRevenue += revenue;
+                const date = new Date(booking.created_at).toISOString().split('T')[0];
+                if (!revenueByDate[date]) {
+                    revenueByDate[date] = 0;
+                }
+                revenueByDate[date] += revenue;
+            }
+        });
+        const dailyRevenue = Object.keys(revenueByDate).map(date => ({
+            date,
+            revenue: revenueByDate[date]
+        })).sort((a, b) => a.date.localeCompare(b.date));
+        res.json({
+            events: eventsData,
+            bookings: bookingsData,
+            stats: {
+                totalTicketsSold,
+                totalRevenue,
+                dailyRevenue
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error fetching organizer dashboard data:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+// Organizer: Update booking status for their events
+app.patch('/api/organizer/bookings/:id', async (req, res) => {
+    try {
+        const { status, organizer_id } = req.body; // Need to verify if the event belongs to this organizer, but since we trust the client to an extent or we can query it
+        // Optional: Verify if the booking belongs to an event of the organizer
+        const { data: bookingData, error: bookingError } = await supabase
+            .from('bookings')
+            .select('event_id')
+            .eq('id', req.params.id)
+            .single();
+        if (bookingError)
+            throw bookingError;
+        const { data: eventData, error: eventError } = await supabase
+            .from('events')
+            .select('organizer_id')
+            .eq('id', bookingData.event_id)
+            .single();
+        if (eventError)
+            throw eventError;
+        if (eventData.organizer_id !== organizer_id) {
+            return res.status(403).json({ error: 'Unauthorized to update this booking' });
+        }
         const { data, error } = await supabase.from('bookings').update({ status }).eq('id', req.params.id).select();
         if (error)
             throw error;
@@ -160,6 +306,42 @@ app.get('/api/bookings/user/:email', async (req, res) => {
     }
     catch (error) {
         console.error('Error fetching user bookings:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+// User: Request cancellation for a booking
+app.patch('/api/bookings/:id/cancel-request', upload.single('proof'), async (req, res) => {
+    try {
+        const { reason } = req.body;
+        let proofUrl = null;
+        if (req.file) {
+            const fileName = `cancellations/${Date.now()}-${req.file.originalname}`;
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('eventgate-bucket')
+                .upload(fileName, req.file.buffer, { contentType: req.file.mimetype });
+            if (uploadError)
+                throw uploadError;
+            const { data: publicUrlData } = supabase.storage.from('eventgate-bucket').getPublicUrl(fileName);
+            proofUrl = publicUrlData.publicUrl;
+        }
+        const { data, error } = await supabase
+            .from('bookings')
+            .update({
+            status: 'cancellation_requested',
+            cancellation_reason: reason || null,
+            cancellation_proof_url: proofUrl
+        })
+            .eq('id', req.params.id)
+            .select();
+        if (error)
+            throw error;
+        if (!data || data.length === 0) {
+            return res.status(404).json({ error: 'Booking not found' });
+        }
+        res.json({ message: 'Cancellation requested successfully', booking: data[0] });
+    }
+    catch (error) {
+        console.error('Error requesting cancellation:', error);
         res.status(500).json({ error: error.message });
     }
 });
