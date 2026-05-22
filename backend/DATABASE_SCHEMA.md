@@ -36,9 +36,15 @@ CREATE TABLE IF NOT EXISTS bookings (
   ticket_category TEXT DEFAULT 'Regular',
   quantity INTEGER DEFAULT 1,
   payment_proof_url TEXT, -- URL to the uploaded image in Supabase Storage
-  status TEXT DEFAULT 'pending', -- Options: 'pending', 'confirmed', 'rejected'
+  status TEXT DEFAULT 'pending', -- Options: 'pending', 'confirmed', 'rejected', 'cancellation_requested', 'cancelled'
+  cancellation_reason TEXT, -- Reason provided by user when requesting cancellation
+  cancellation_proof_url TEXT, -- Optional URL to proof of cancellation reason
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- MIGRATION: If you already have the bookings table, run this:
+-- ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancellation_reason TEXT;
+-- ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancellation_proof_url TEXT;
 
 -- Enable Row Level Security (RLS) - Optional but recommended
 -- For development, you can disable RLS or create policies to allow access.
